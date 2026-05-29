@@ -3,8 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#e31b23" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
 <title>🛒 Súper Lista Familiar</title>
+
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.svg">
+<link rel="icon" href="/icon-192.svg" type="image/svg+xml">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -337,6 +344,7 @@ button:active{
 .action-btn{ border:none; padding:14px; border-radius:12px; cursor:pointer; font-weight:700; color:white; font-size: 14px;}
 .whatsapp{ background:#25D366; }
 .export{ background:#111827; }
+.install{ background:var(--primary); display:none; }
 .clear{ background:#ef4444; }
 
 /* Ajustes para pantallas medianas (Tabletas o pantallas más anchas) */
@@ -463,6 +471,7 @@ button:active{
         </div>
 
         <div class="actions">
+            <button class="action-btn install" id="installBtn">📲 Instalar app</button>
             <button class="action-btn whatsapp" id="shareBtn">📲 Compartir por WhatsApp</button>
             <button class="action-btn export" id="exportBtn">💾 Respaldar Lista (JSON)</button>
             <div style="position:relative;">
@@ -507,7 +516,20 @@ const PRODUCT_SUGGESTIONS = [
     'Papel Higiénico'
 ];
 
-let items = JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_PRODUCTS;
+let items;
+try {
+    const storedItems = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    items = Array.isArray(storedItems) ? storedItems : DEFAULT_PRODUCTS;
+} catch {
+    items = DEFAULT_PRODUCTS;
+}
+items = items.map(item => ({
+    name: item.name,
+    type: item.type,
+    price: item.price,
+    quantity: item.quantity,
+    bought: Boolean(item.bought)
+}));
 
 const itemInput = document.getElementById('itemInput');
 const inputType = document.getElementById('inputType');
@@ -519,6 +541,7 @@ const totalPrice = document.getElementById('totalPrice');
 const footerTotal = document.getElementById('footerTotal');
 const progressBar = document.getElementById('progressBar');
 const toast = document.getElementById('toast');
+const installBtn = document.getElementById('installBtn');
 let toastTimer;
 let hideBought = false;
 
@@ -766,7 +789,13 @@ document.getElementById('importFile').addEventListener('change', (e) => {
         try {
             const data = JSON.parse(evt.target.result);
             if(!Array.isArray(data)) throw new Error();
-            items = data;
+            items = data.map(item => ({
+                name: String(item.name || '').trim(),
+                type: item.type === 'libras' ? 'libras' : 'unidades',
+                price: item.price === '' || item.price == null ? '' : Number(item.price),
+                quantity: item.quantity === '' || item.quantity == null ? '' : Number(item.quantity),
+                bought: Boolean(item.bought)
+            })).filter(item => item.name);
             renderList();
             showToast('Lista cargada con éxito');
         } catch {
@@ -777,32 +806,11 @@ document.getElementById('importFile').addEventListener('change', (e) => {
 });
 
 if('serviceWorker' in navigator){
-
-    const sw = `
-        self.addEventListener(
-            'install',
-            e => {
-                self.skipWaiting();
-            }
-        );
-
-        self.addEventListener(
-            'fetch',
-            () => {}
-        );
-    `;
-
-    const blob =
-        new Blob(
-            [sw],
-            { type:'text/javascript' }
-        );
-
-    const swURL =
-        URL.createObjectURL(blob);
-
-    navigator.serviceWorker
-        .register(swURL);
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {
+            console.warn('No se pudo registrar el service worker');
+        });
+    });
 }
 
 let deferredPrompt;
@@ -815,12 +823,32 @@ window.addEventListener(
 
         deferredPrompt = e;
 
-        showToast(
-            '📲 Puedes instalar la app'
-        );
+        installBtn.style.display = 'block';
+
+        showToast('📲 Puedes instalar la app');
 
     }
 );
+
+installBtn.addEventListener('click', async () => {
+    if(!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+
+    if(choice.outcome === 'accepted'){
+        showToast('Instalación iniciada');
+    }
+
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+    showToast('App instalada');
+});
 
 renderList();
 </script>

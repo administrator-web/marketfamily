@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Súper Lista Familiar">
+  <rect width="192" height="192" rx="44" fill="#e31b23"/>
+  <circle cx="78" cy="144" r="12" fill="#ffffff" opacity="0.95"/>
+  <circle cx="130" cy="144" r="12" fill="#ffffff" opacity="0.95"/>
+  <path d="M42 44h22l10 48h72l14-34H72" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M70 76h84l-10 38H80Z" fill="#ffffff" opacity="0.98"/>
+  <path d="M78 88h16v10H78zM104 88h16v10h-16z" fill="#e31b23"/>
+  <path d="M66 56h8l8 42" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+</svg>
