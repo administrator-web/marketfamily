@@ -362,6 +362,88 @@ button:active{
     font-size: 14px; text-align: center; width: 80%; max-width: 300px;
 }
 .toast.show{ opacity:1; }
+#shareModal{
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.72);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:16px;
+}
+
+#shareModal.show{ display:flex; }
+
+.modal-card{
+    width:min(720px, 100%);
+    background:var(--card);
+    color:var(--text);
+    border-radius:20px;
+    box-shadow:var(--shadow);
+    border:1px solid #e5e7eb;
+    overflow:hidden;
+}
+
+.modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:16px 18px;
+    border-bottom:1px solid #e5e7eb;
+    background:linear-gradient(135deg, rgba(227,27,35,.08), rgba(227,27,35,.02));
+}
+
+.modal-header h2{
+    font-size:16px;
+    font-weight:800;
+}
+
+.modal-body{
+    padding:16px 18px 18px;
+}
+
+.modal-preview{
+    width:100%;
+    min-height:320px;
+    resize:vertical;
+    border:1px solid #d1d5db;
+    border-radius:14px;
+    padding:14px;
+    font: inherit;
+    line-height:1.5;
+    background:#f9fafb;
+    color:var(--text);
+}
+
+.modal-actions{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+    margin-top:14px;
+}
+
+.modal-actions .action-btn{
+    width:100%;
+}
+
+.close-modal{
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    font-size:28px;
+    line-height:1;
+    cursor:pointer;
+    padding:0 4px;
+}
+
+@media (min-width: 480px) {
+    .modal-actions{
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 #fabButton{
     position:fixed;
 
@@ -472,7 +554,7 @@ button:active{
 
         <div class="actions">
             <button class="action-btn install" id="installBtn">📲 Instalar app</button>
-            <button class="action-btn whatsapp" id="shareBtn">📲 Compartir por WhatsApp</button>
+            <button class="action-btn whatsapp" id="shareBtn">📲 Ver y enviar por WhatsApp</button>
             <button class="action-btn export" id="exportBtn">💾 Respaldar Lista (JSON)</button>
             <div style="position:relative;">
                 <button class="action-btn export" style="width:100%;">📂 Cargar Respaldo (JSON)</button>
@@ -485,6 +567,22 @@ button:active{
 </div>
 
 <div id="toast" class="toast"></div>
+<div id="shareModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+        <div class="modal-header">
+            <h2 id="shareModalTitle">Vista previa para WhatsApp</h2>
+            <button class="close-modal" id="closeShareModal" aria-label="Cerrar vista previa">×</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="sharePreview" class="modal-preview" readonly></textarea>
+            <div class="modal-actions">
+                <button class="action-btn export" id="copyShareBtn">📋 Copiar texto</button>
+                <button class="action-btn whatsapp" id="openWhatsappBtn">📲 Abrir WhatsApp</button>
+                <button class="action-btn clear" id="closeShareBtn">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 <button id="fabButton">🛒</button>
 
 <script>
@@ -542,6 +640,12 @@ const footerTotal = document.getElementById('footerTotal');
 const progressBar = document.getElementById('progressBar');
 const toast = document.getElementById('toast');
 const installBtn = document.getElementById('installBtn');
+const shareModal = document.getElementById('shareModal');
+const sharePreview = document.getElementById('sharePreview');
+const copyShareBtn = document.getElementById('copyShareBtn');
+const openWhatsappBtn = document.getElementById('openWhatsappBtn');
+const closeShareBtn = document.getElementById('closeShareBtn');
+const closeShareModal = document.getElementById('closeShareModal');
 let toastTimer;
 let hideBought = false;
 
@@ -564,6 +668,95 @@ PRODUCT_SUGGESTIONS.forEach(product => {
 
 function saveItems(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function formatCurrency(value){
+    return `C$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function buildWhatsappMessage(){
+    const today = new Date().toLocaleDateString('es-NI', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    const totalItems = items.length;
+    const boughtItems = items.filter(item => item.bought).length;
+    const pendingItems = totalItems - boughtItems;
+    const totalBought = items.reduce((acc, item) => {
+        if(item.bought) return acc + ((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 0));
+        return acc;
+    }, 0);
+    const totalEstimated = items.reduce((acc, item) => {
+        return acc + ((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 0));
+    }, 0);
+
+    const completed = items.filter(item => item.bought);
+    const pending = items.filter(item => !item.bought);
+
+    let text = `🛒 *SÚPER LISTA FAMILIAR*\n`;
+    text += `📅 ${today}\n\n`;
+    text += `📊 *Resumen*\n`;
+    text += `• Artículos: ${totalItems}\n`;
+    text += `• Comprados: ${boughtItems}\n`;
+    text += `• Pendientes: ${pendingItems}\n`;
+    text += `• Total comprado: ${formatCurrency(totalBought)}\n`;
+    text += `• Total estimado: ${formatCurrency(totalEstimated)}\n\n`;
+
+    if(completed.length > 0){
+        text += `✅ *Comprados*\n`;
+        completed.forEach(item => {
+            const price = parseFloat(item.price) || 0;
+            const qty = parseFloat(item.quantity) || 0;
+            const subtotal = price * qty;
+            const unitLabel = item.type === 'libras' ? 'lb' : 'ud';
+
+            text += `• ${item.name} - ${qty} ${unitLabel}`;
+            if(price > 0){
+                text += ` x ${formatCurrency(price)} = ${formatCurrency(subtotal)}`;
+            }
+            text += `\n`;
+        });
+        text += `\n`;
+    }
+
+    if(pending.length > 0){
+        text += `⬜ *Pendientes*\n`;
+        pending.forEach(item => {
+            const price = parseFloat(item.price) || 0;
+            const qty = parseFloat(item.quantity) || 0;
+            const subtotal = price * qty;
+            const unitLabel = item.type === 'libras' ? 'lb' : 'ud';
+
+            text += `• ${item.name} - ${qty} ${unitLabel}`;
+            if(price > 0){
+                text += ` x ${formatCurrency(price)} = ${formatCurrency(subtotal)}`;
+            } else {
+                text += ` (sin precio)`;
+            }
+            text += `\n`;
+        });
+    }
+
+    return text.trim();
+}
+
+function openShareModal(){
+    if(items.length === 0){
+        showToast('La lista está vacía');
+        return;
+    }
+
+    sharePreview.value = buildWhatsappMessage();
+    shareModal.classList.add('show');
+    shareModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeShareModalView(){
+    shareModal.classList.remove('show');
+    shareModal.setAttribute('aria-hidden', 'true');
 }
 
 function renderList(){
@@ -746,28 +939,38 @@ document
 
 });
 
-document.getElementById('shareBtn').addEventListener('click', () => {
-    if(items.length === 0){ alert('La lista está vacía'); return; }
+document.getElementById('shareBtn').addEventListener('click', openShareModal);
 
-    let text = `🛒 *SÚPER LISTA FAMILIAR* \n\n`;
-    items.forEach(item => {
-        const check = item.bought ? '✅' : '⬜';
-        const price = parseFloat(item.price) || 0;
-        const qty = parseFloat(item.quantity) || 0;
-        const sub = price * qty;
-        
-        text += `${check} *${item.name}*\n`;
-        if(price > 0){
-            text += `   ${qty} ${item.type === 'libras' ? 'lbs' : 'uds'} x C$ ${price.toFixed(2)} = C$ ${sub.toFixed(2)}\n`;
-        } else {
-            text += `   ${qty} ${item.type === 'libras' ? 'lbs' : 'uds'} (Falta precio)\n`;
-        }
-    });
+copyShareBtn.addEventListener('click', async () => {
+    const text = sharePreview.value || buildWhatsappMessage();
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('Texto copiado');
+    } catch {
+        sharePreview.select();
+        document.execCommand('copy');
+        showToast('Texto copiado');
+    }
+});
 
-    const total = items.reduce((acc, i) => acc + ((parseFloat(i.price)||0) * (parseFloat(i.quantity)||0)), 0);
-    text += `\n💰 *Total Estimado:* C$ ${total.toFixed(2)}`;
-
+openWhatsappBtn.addEventListener('click', () => {
+    const text = sharePreview.value || buildWhatsappMessage();
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+});
+
+closeShareBtn.addEventListener('click', closeShareModalView);
+closeShareModal.addEventListener('click', closeShareModalView);
+
+shareModal.addEventListener('click', (e) => {
+    if(e.target === shareModal){
+        closeShareModalView();
+    }
+});
+
+window.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape'){
+        closeShareModalView();
+    }
 });
 
 document.getElementById('exportBtn').addEventListener('click', () => {
