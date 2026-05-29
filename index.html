@@ -344,7 +344,7 @@ button:active{
 .action-btn{ border:none; padding:14px; border-radius:12px; cursor:pointer; font-weight:700; color:white; font-size: 14px;}
 .whatsapp{ background:#25D366; }
 .export{ background:#111827; }
-.install{ background:var(--primary); display:none; }
+.install{ background:var(--primary); display:block; }
 .clear{ background:#ef4444; }
 
 /* Ajustes para pantallas medianas (Tabletas o pantallas más anchas) */
@@ -1034,7 +1034,10 @@ window.addEventListener(
 );
 
 installBtn.addEventListener('click', async () => {
-    if(!deferredPrompt) return;
+    if(!deferredPrompt){
+        showToast('Instalación no disponible aquí. Usa Chrome en Android o abre la web por HTTPS y vuelve a intentarlo.');
+        return;
+    }
 
     deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
